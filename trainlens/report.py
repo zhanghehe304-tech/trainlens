@@ -132,6 +132,16 @@ def build_report(tracker) -> str:
             )
         )
 
+    if "grad_norm" in available:
+        grad_values = _values(records, "grad_norm")
+        positive = all(v > 0 for v in grad_values)
+        charts.append(
+            _chart_panel(
+                "Gradient norm",
+                line_chart(x, {"grad norm": grad_values}, "Gradient norm", xlabel, "L2 norm", logy=positive),
+            )
+        )
+
     # ---- 指标卡
     cards: List[str] = []
     best_val_acc = max(_values(records, val_acc)) if val_acc else None
@@ -180,6 +190,27 @@ def build_report(tracker) -> str:
         except Exception as exc:  # 图渲染失败不该让整份报告打不开
             class_panel = f'<div class="panel"><p class="note">混淆矩阵渲染失败：{html.escape(str(exc))}</p></div>'
 
+    # ---- 每层激活统计（torch 适配器产出）
+    act_panel = ""
+    activations = getattr(tracker, "activations", None)
+    if activations:
+        rows = "".join(
+            "<tr>"
+            f"<td>{html.escape(str(layer))}</td>"
+            f"<td>{_fmt(values.get('mean'))}</td>"
+            f"<td>{_fmt(values.get('std'))}</td>"
+            f"<td>{_fmt(values.get('dead') * 100, 1)}%</td>"
+            "</tr>"
+            for layer, values in activations.items()
+        )
+        act_panel = (
+            '<div class="panel">'
+            '<p class="note">最后一轮、最后一次前向的统计。置零比例高，说明那层有大量神经元没被激活。</p>'
+            "<table><thead><tr><th>layer</th><th>mean</th><th>std</th><th>zeros</th></tr>"
+            f"</thead><tbody>{rows}</tbody></table>"
+            "</div>"
+        )
+
     # ---- 错分样本
     errors_panel = ""
     errors = getattr(tracker, "_errors", [])
@@ -227,6 +258,8 @@ def build_report(tracker) -> str:
 
     if class_panel:
         body_parts.append(_section("Validation", class_panel))
+    if act_panel:
+        body_parts.append(_section("Activations", act_panel))
     if errors_panel:
         body_parts.append(_section("Misclassified samples", errors_panel))
     if info_panel:

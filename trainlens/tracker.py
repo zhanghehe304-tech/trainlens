@@ -47,6 +47,9 @@ class Tracker:
         # 运行级别的补充信息，例如参数量、设备、数据集名称
         self.meta: Dict[str, Any] = {}
 
+        # 每层激活统计（由 torch 适配器写入）
+        self.activations: Dict[str, Dict[str, float]] = {}
+
         self.created_at = time.time()
         self.rows: List[Dict[str, float]] = []
         self.epochs: List[Dict[str, float]] = []
@@ -111,6 +114,12 @@ class Tracker:
 
         self.epochs.append(entry)
         self.rows = []
+        return self
+
+    def add_activations(self, stats: Dict[str, Dict[str, float]]) -> "Tracker":
+        """写入每层激活统计（均值 / 标准差 / 置零比例），后写覆盖先写。"""
+        for layer, values in stats.items():
+            self.activations[layer] = dict(values)
         return self
 
     def add_predictions(self, y_true: Any, y_pred: Any, reset: bool = False) -> "Tracker":
