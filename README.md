@@ -78,15 +78,15 @@ for epoch in range(epochs):
 watch.close()
 ```
 
-报告里会多出两张梯度图——全局范数，以及按层拆开的范数（只画最后一轮最大的六层，再多图例就挤了）——外加一张逐层统计表：均值、标准差、置零比例。置零比例就是「这层有多少神经元彻底不响」，ReLU 层健康时通常不该高得离谱。
+报告里会多出两张梯度图——全局范数，以及按层拆开的范数（默认只画最后一轮最大的六层，再多图例就挤了）——外加一张逐层统计表：均值、标准差、置零比例。置零比例就是「这层有多少神经元彻底不响」，ReLU 层健康时通常不该高得离谱。
 
-只挂 `Linear / Conv / ReLU / LeakyReLU / GELU / SiLU`，最多 16 层，够覆盖常见模型，也不会把大模型拖慢。核心包不 import torch，没装 PyTorch 完全不影响使用。
+只挂 `Linear / Conv / ReLU / LeakyReLU / GELU / SiLU`，最多 16 层，够覆盖常见模型，也不会把大模型拖慢。层名带形状：`0 · Linear(196→64)`、`3 · Conv2d(3→32, k3x3 s2x2)`，后者连感受野和步长都写上了，堆十几层卷积时不至于分不清谁是谁。核心包不 import torch，没装 PyTorch 完全不影响使用。
 
 ## API
 
 | 方法 | 说明 |
 | --- | --- |
-| `Tracker(name, classes=None, notes="")` | 创建一次运行；`classes` 用来给类别起名 |
+| `Tracker(name, classes=None, notes="", top_layers=6)` | 创建一次运行；`classes` 用来给类别起名，`top_layers` 控制逐层梯度图最多画几层 |
 | `.info(**kv)` | 补充运行信息（数据集、参数量、设备），显示在报告里 |
 | `.log(epoch=None, step=None, **metrics)` | 记录一个训练步；非数值的键会被忽略 |
 | `.end_epoch(**extra)` | 结束本轮，压成均值；`extra` 用来传 `val_loss`、`val_acc` |

@@ -87,6 +87,16 @@ class TorchHookTest(unittest.TestCase):
         self.assertIn("Gradient norm", html)  # 图片 alt 文本
         self.assertIn("by layer", html)
 
+    def test_conv_label_has_kernel_and_stride(self):
+        # 卷积层的层名要能看出感受野，不然一堆 Conv2d(3→32) 分不清
+        model = nn.Sequential(nn.Conv2d(3, 8, kernel_size=3, stride=2), nn.ReLU())
+        tracker = Tracker("torch-test", top_layers=3)
+        watch = _track(model, tracker)
+        labels = list(watch._stats)
+        self.assertTrue(any("k3x3 s2x2" in name for name in labels))
+        self.assertEqual(tracker.top_layers, 3)  # 逐层梯度图最多画几层
+        watch.close()
+
     def test_close_is_idempotent(self):
         model = make_model()
         tracker = Tracker("torch-test")
