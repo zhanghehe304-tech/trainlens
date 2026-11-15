@@ -1,10 +1,12 @@
 # trainlens
 
+[![CI](https://github.com/zhanghehe304-tech/trainlens/actions/workflows/ci.yml/badge.svg)](https://github.com/zhanghehe304-tech/trainlens/actions/workflows/ci.yml)
+
 > 训练跑完，把过程拍成一张照片。
 
-记录标量指标、验证集预测和错分样本，最后产出一份**单文件 HTML 报告**：训练曲线、混淆矩阵、逐类指标、错分样本网格全在里面。不用起 TensorBoard，也不用写一堆 matplotlib 样板代码。
+记录标量指标、验证集预测和错分样本，最后产出一份**单文件 HTML 报告**：训练曲线、混淆矩阵、逐类指标、错分样本网格全在里面。不用起 TensorBoard，也不用写一堆 matplotlib 样板代码。PyTorch 用户再加一句 `track(model)`，梯度范数和每层激活统计也一并进报告。
 
-![report preview](https://aka.doubaocdn.com/s/IvXvfUGASL)
+![report preview](https://aka.doubaocdn.com/s/WBOoxjNwpK)
 
 ## 为什么做这个
 
@@ -51,6 +53,35 @@ path = tracker.report("reports/")
 
 要点只有三个：训练步里 `log()`，轮末 `end_epoch()` 把验证指标一起塞进去，验证完把预测和错分样本交给 tracker。`reset=True` 很关键——混淆矩阵只保留最后一轮，不然会越滚越糊。
 
+## 梯度与激活（PyTorch）
+
+PyTorch 用户还能再省一步：`track(model, tracker)` 会挂上 forward hook，之后每个 step 顺手记下梯度范数，每轮结束自动写每层激活统计。
+
+```python
+from trainlens import Tracker, track
+
+tracker = Tracker("resnet18", classes=classes)
+watch = track(model, tracker)          # 一句开始观测
+
+for epoch in range(epochs):
+    for step, (x, y) in enumerate(loader):
+        logits = model(x)
+        loss = criterion(logits, y)
+        optimizer.zero_grad()
+        loss.backward()
+
+        # 梯度还在，趁这时候记；grad_norm 会自动带上
+        watch.log(epoch=epoch, step=step, loss=loss.item(), acc=acc, lr=lr)
+        optimizer.step()
+
+    watch.end_epoch(val_loss=val_loss, val_acc=val_acc)
+watch.close()
+```
+
+报告里会多出一张梯度范数曲线（对数坐标）和一张逐层统计表：均值、标准差、置零比例。置零比例就是「这层有多少神经元彻底不响」，ReLU 层健康时通常不该高得离谱。
+
+只挂 `Linear / Conv / ReLU / LeakyReLU / GELU / SiLU`，最多 16 层，够覆盖常见模型，也不会把大模型拖慢。核心包不 import torch，没装 PyTorch 完全不影响使用。
+
 ## API
 
 | 方法 | 说明 |
@@ -62,6 +93,10 @@ path = tracker.report("reports/")
 | `.add_predictions(y_true, y_pred, reset=False)` | 累积验证集预测，用于混淆矩阵 |
 | `.add_errors(images, y_true, y_pred, scores=None, max_keep=128)` | 留错分样本，置信度越低越靠前 |
 | `.report(out_dir="reports")` | 生成报告，返回文件路径 |
+| `track(model, tracker)` | PyTorch：挂 hook，返回 `watch`（需要额外安装 torch） |
+| `watch.log(...)` | 同 `Tracker.log`，额外自动记录 `grad_norm` |
+| `watch.end_epoch(**extra)` | 先写入每层激活统计，再压 epoch 均值 |
+| `watch.close()` | 摘掉 hook（也可以 `with track(...) as watch`） |
 
 支持的图像形状：`(N, H, W)` 灰度、`(N, H, W, 3)` 彩色。
 
@@ -69,9 +104,9 @@ path = tracker.report("reports/")
 
 顶部是一排指标卡：最佳验证准确率、最终 loss、轮数、耗时、参数量。
 
-接着三张曲线：loss、准确率、学习率——学习率自动转对数坐标，步数超过 50 时自动叠一条平滑线，原始点保留成淡色底纹。
+接着三张曲线：loss、准确率、学习率——学习率自动转对数坐标，步数超过 50 时自动叠一条平滑线，原始点保留成淡色底纹。用了 `track()` 的话还会多一张梯度范数曲线，同样走对数坐标，训练后期异常反弹一眼就能看出来。
 
-然后是验证部分：混淆矩阵热力图，配一张逐类 precision / recall / f1 / support 的表。
+然后是验证部分：混淆矩阵热力图，配一张逐类 precision / recall / f1 / support 的表。接 PyTorch 时后面再跟一张激活统计表，逐层给出均值、标准差和置零比例。
 
 最后是错分样本网格，按模型对预测类别的置信度从低到高排——排在前面那些，往往就是「它凭什么错」的答案。
 
@@ -93,6 +128,7 @@ trainlens/
 │   ├── tracker.py    # 记录指标、预测、错分样本
 │   ├── report.py     # 组装 HTML
 │   ├── viz.py        # 曲线、热力图、样本网格
+│   ├── torch_hooks.py # track(model)：梯度范数 + 激活统计
 │   ├── demo.py       # 合成数据 + NumPy MLP
 │   └── cli.py        # trainlens demo
 ├── examples/         # 各种框架的接入示例
@@ -111,8 +147,8 @@ CI 在 Python 3.10 / 3.12 / 3.13 上跑单测，外加一次 demo 冒烟。
 
 ## Roadmap
 
-- v0.2 PyTorch 适配器：一句 `track(model)` 自动记录梯度范数、激活统计
 - 报告同时导出 CSV / JSON，方便跨实验对比画图
+- 逐层梯度范数，而不只是全局范数
 - 深色主题与自定义模板
 - HuggingFace Trainer、Lightning 的 callback
 
