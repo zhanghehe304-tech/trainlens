@@ -61,6 +61,7 @@ class TorchWatch:
         self.log_grad_norm = grad_norm
 
         self._stats: Dict[str, Dict[str, float]] = {}
+        self._modules: Dict[str, nn.Module] = {}
         self._handles: list = []
         self._attach()
 
@@ -76,6 +77,7 @@ class TorchWatch:
             picked += 1
             stats_key = _label(name, module)
             self._stats[stats_key] = {"n": 0.0, "sum": 0.0, "sum_sq": 0.0, "zeros": 0.0, "elems": 0.0}
+            self._modules[stats_key] = module
             self._handles.append(module.register_forward_hook(self._make_hook(stats_key)))
 
     def _make_hook(self, name: str):
@@ -116,10 +118,25 @@ class TorchWatch:
             total += float(param.grad.detach().pow(2).sum())
         return total ** 0.5
 
+    def layer_grad_norms(self) -> Dict[str, float]:
+        """每个被观测层的梯度 L2 范数（只看该层自己的参数）。"""
+        norms: Dict[str, float] = {}
+        for name, module in self._modules.items():
+            total = 0.0
+            for param in module.parameters(recurse=False):
+                if param.grad is None:
+                    continue
+                total += float(param.grad.detach().pow(2).sum())
+            if total > 0.0:
+                norms[name] = total ** 0.5
+        return norms
+
     def log(self, epoch: Optional[int] = None, step: Optional[int] = None, **metrics: Any) -> "TorchWatch":
-        """记录一步；默认顺手带上 ``grad_norm``。"""
+        """记录一步；默认顺手带上全局与逐层 ``grad_norm``。"""
         if self.log_grad_norm:
             metrics.setdefault("grad_norm", self.grad_norm())
+            for name, norm in self.layer_grad_norms().items():
+                metrics.setdefault(f"grad:{name}", norm)
         self.tracker.log(epoch=epoch, step=step, **metrics)
         return self
 
