@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
+
+# 生成的报告默认不进仓库
+out/
+reports/
+*.html
+!docs/**/*.html

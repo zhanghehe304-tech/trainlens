@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "trainlens"
+version = "0.1.0"
+description = "记录训练过程，产出一份可以直接分享的 HTML 报告。"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "周旭阳" }]
+keywords = ["deep-learning", "training", "visualization", "report", "pytorch", "matplotlib"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: OS Independent",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = ["numpy>=1.22", "matplotlib>=3.5"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+trainlens = "trainlens.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["trainlens*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
