@@ -47,6 +47,9 @@ class TorchHookTest(unittest.TestCase):
 
         self.assertEqual(len(tracker.rows), 1)
         self.assertGreater(tracker.rows[0]["grad_norm"], 0.0)
+        # 逐层梯度：两个带权重的 Linear 各一条，ReLU 没参数不参与
+        layer_keys = [k for k in tracker.rows[0] if k.startswith("grad:")]
+        self.assertEqual(len(layer_keys), 2)
         watch.close()
 
     def test_activations_have_layer_stats(self):
@@ -82,6 +85,7 @@ class TorchHookTest(unittest.TestCase):
 
         self.assertIn("Activations", html)
         self.assertIn("Gradient norm", html)  # 图片 alt 文本
+        self.assertIn("by layer", html)
 
     def test_close_is_idempotent(self):
         model = make_model()

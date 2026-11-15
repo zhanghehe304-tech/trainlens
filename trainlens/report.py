@@ -80,6 +80,12 @@ def _human_time(seconds: float) -> str:
     return f"{seconds / 3600:.1f}h"
 
 
+def _short(text: str, limit: int = 24) -> str:
+    """图例里的层名太长会撑破面板，截一下。"""
+    text = str(text).replace(" · ", " ")
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
 def _section(title: str, body: str, extra_class: str = "") -> str:
     cls = f' class="{extra_class}"' if extra_class else ""
     return f'<section{cls}><h2>{html.escape(title)}</h2>{body}</section>'
@@ -139,6 +145,19 @@ def build_report(tracker) -> str:
             _chart_panel(
                 "Gradient norm",
                 line_chart(x, {"grad norm": grad_values}, "Gradient norm", xlabel, "L2 norm", logy=positive),
+            )
+        )
+
+    # 逐层梯度：只画最后一轮最大的六层，多了图例就没法看了
+    layer_keys = sorted(k for k in available if k.startswith("grad:"))
+    if layer_keys:
+        ranked = sorted(layer_keys, key=lambda key: (_values(records, key) or [0.0])[-1], reverse=True)[:6]
+        layer_series = {_short(key.split(":", 1)[1]): _values(records, key) for key in ranked}
+        dense = all(v > 0 for values in layer_series.values() for v in values)
+        charts.append(
+            _chart_panel(
+                "Gradient norm by layer",
+                line_chart(x, layer_series, "Gradient norm by layer", xlabel, "L2 norm", logy=dense),
             )
         )
 
