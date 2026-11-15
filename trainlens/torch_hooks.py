@@ -41,13 +41,22 @@ _HOOK_TYPES = (
 )
 
 
+def _size_text(value) -> str:
+    """把 kernel_size / stride 这类 int 或 tuple 统一写成 3 或 3x3。"""
+    if isinstance(value, int):
+        return str(value)
+    return "x".join(str(int(v)) for v in value)
+
+
 def _label(name: str, module: nn.Module) -> str:
     """给层起一个有信息量的名字，报告里比裸编号好读。"""
     kind = type(module).__name__
     if isinstance(module, nn.Linear):
         return f"{name} · {kind}({module.in_features}→{module.out_features})"
-    if isinstance(module, nn.Conv2d):
-        return f"{name} · {kind}({module.in_channels}→{module.out_channels})"
+    if isinstance(module, (nn.Conv1d, nn.Conv2d, nn.Conv3d)):
+        kernel = _size_text(module.kernel_size)
+        stride = _size_text(module.stride)
+        return f"{name} · {kind}({module.in_channels}→{module.out_channels}, k{kernel} s{stride})"
     return f"{name} · {kind}"
 
 

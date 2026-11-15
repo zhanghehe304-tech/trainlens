@@ -148,10 +148,11 @@ def build_report(tracker) -> str:
             )
         )
 
-    # 逐层梯度：只画最后一轮最大的六层，多了图例就没法看了
+    # 逐层梯度：默认只画最后一轮最大的六层，多了图例就没法看了（trainlens/tracker 里可改）
     layer_keys = sorted(k for k in available if k.startswith("grad:"))
     if layer_keys:
-        ranked = sorted(layer_keys, key=lambda key: (_values(records, key) or [0.0])[-1], reverse=True)[:6]
+        top_k = max(int(getattr(tracker, "top_layers", 6) or 6), 1)
+        ranked = sorted(layer_keys, key=lambda key: (_values(records, key) or [0.0])[-1], reverse=True)[:top_k]
         layer_series = {_short(key.split(":", 1)[1]): _values(records, key) for key in ranked}
         dense = all(v > 0 for values in layer_series.values() for v in values)
         charts.append(

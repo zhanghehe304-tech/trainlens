@@ -37,12 +37,15 @@ class Tracker:
         name: str = "run",
         classes: Optional[Sequence[Any]] = None,
         notes: str = "",
+        top_layers: int = 6,
     ) -> None:
         self.name = str(name)
         self.classes: Optional[List[str]] = (
             [str(c) for c in classes] if classes is not None else None
         )
         self.notes = notes
+        # 逐层梯度图最多画几层；层太多时图例挤成一团
+        self.top_layers = int(top_layers)
 
         # 运行级别的补充信息，例如参数量、设备、数据集名称
         self.meta: Dict[str, Any] = {}
